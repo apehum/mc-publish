@@ -128,7 +128,12 @@ export default abstract class ModPublisher extends Publisher<ModPublisherOptions
             }
         }
 
-        const gameVersions = processMultilineInput(options.gameVersions);
+        const resolver = options.versionResolver && MinecraftVersionResolver.byName(options.versionResolver) || MinecraftVersionResolver.releasesIfAny;
+
+        const gameVersions = (await Promise.all(processMultilineInput(options.gameVersions).flatMap(version => resolver.resolve(version))))
+            .flatMap(versions => versions)
+            .map(version => version.id);
+        
         const minecraftDisplayVersion =
             parseVersionNameFromFileVersion(filename) ||
             metadata?.dependencies.filter(x => x.id === "minecraft").map(x => parseVersionName(x.version))[0] ||
@@ -140,7 +145,6 @@ export default abstract class ModPublisher extends Publisher<ModPublisherOptions
 
         if (!gameVersions.length && this.requiresGameVersions) {
             if (minecraftVersion) {
-                const resolver = options.versionResolver && MinecraftVersionResolver.byName(options.versionResolver) || MinecraftVersionResolver.releasesIfAny;
                 gameVersions.push(...(await resolver.resolve(minecraftVersion)).map(x => x.id));
             }
             if (!gameVersions.length) {

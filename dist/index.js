@@ -25994,10 +25994,11 @@ function getCompatibleBuilds(build) {
                     outputString = split[0];
                 }
                 else {
-                    outputString = `>=${split[0]} <=${split[1]}`;
+                    const startBoundsSymbol = buildString.startsWith("[") ? ">=" : ">";
+                    const endBoundsSymbol = buildString.endsWith("]") ? "<=" : "<";
+                    outputString = `${startBoundsSymbol}${split[0]} ${endBoundsSymbol}${split[1]}`;
                 }
             }
-            // maven version range
             buildString = outputString;
         }
         return mcVersions
@@ -26863,7 +26864,10 @@ class ModPublisher extends Publisher {
                     throw new Error("At least one mod loader should be specified");
                 }
             }
-            const gameVersions = processMultilineInput(options.gameVersions);
+            const resolver = options.versionResolver && MinecraftVersionResolver.byName(options.versionResolver) || MinecraftVersionResolver.releasesIfAny;
+            const gameVersions = (yield Promise.all(processMultilineInput(options.gameVersions).flatMap(version => resolver.resolve(version))))
+                .flatMap(versions => versions)
+                .map(version => version.id);
             const minecraftDisplayVersion = parseVersionNameFromFileVersion(filename) ||
                 (metadata === null || metadata === void 0 ? void 0 : metadata.dependencies.filter(x => x.id === "minecraft").map(x => parseVersionName(x.version))[0]) ||
                 parseVersionNameFromFileVersion(version);
@@ -26871,7 +26875,6 @@ class ModPublisher extends Publisher {
                 parseVersionNameFromFileVersion(version);
             if (!gameVersions.length && this.requiresGameVersions) {
                 if (minecraftVersion) {
-                    const resolver = options.versionResolver && MinecraftVersionResolver.byName(options.versionResolver) || MinecraftVersionResolver.releasesIfAny;
                     gameVersions.push(...(yield resolver.resolve(minecraftVersion)).map(x => x.id));
                 }
                 if (!gameVersions.length) {
