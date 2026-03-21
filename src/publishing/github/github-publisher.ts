@@ -66,7 +66,7 @@ export default class GitHubPublisher extends ModPublisher {
             throw new Error(`Cannot find or create release ${tag}`);
         }
 
-        const existingAssets = generated ? [] : (await octokit.rest.repos.listReleaseAssets({ ...repo, release_id: releaseId })).data;
+        const existingAssets = generated ? [] : await octokit.paginate(octokit.rest.repos.listReleaseAssets, { ...repo, release_id: releaseId, per_page: 100 });
         for (const file of files) {
             const existingAsset = existingAssets.find(x => {
                 // delete existing snapshot
