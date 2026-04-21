@@ -55,6 +55,15 @@ async function readChangelog(changelogPath: string): Promise<string | never> {
     return (await file.getBuffer()).toString("utf8");
 }
 
+export function compareFileVersions(a: string, b: string): number {
+    const aVersion = new Version(parseVersionNameFromFileVersion(a));
+    const bVersion = new Version(parseVersionNameFromFileVersion(b));
+
+    return aVersion.major - bVersion.major ||
+        aVersion.minor - bVersion.minor ||
+        aVersion.build - bVersion.build;
+}
+
 export default abstract class ModPublisher extends Publisher<ModPublisherOptions> {
     protected get requiresId(): boolean {
         return true;
@@ -76,14 +85,7 @@ export default abstract class ModPublisher extends Publisher<ModPublisherOptions
         }
 
         if (options.splitReleases) {
-            const sorted = files.sort((a, b) => {
-                const aVersion = new Version(parseVersionNameFromFileVersion(a.name));
-                const bVersion = new Version(parseVersionNameFromFileVersion(b.name));
-
-                return aVersion.major - bVersion.major ||
-                    aVersion.minor - bVersion.minor ||
-                    aVersion.build - bVersion.build;
-            });
+            const sorted = files.sort((a, b) => compareFileVersions(a.name, b.name));
 
             for (const file of sorted) {
                 await this.publishFiles([file], options);

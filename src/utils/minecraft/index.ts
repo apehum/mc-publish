@@ -122,10 +122,16 @@ export function parseVersionNameFromFileVersion(fileVersion: string): string | n
     const mcMatch = fileVersion.match(/mc(\d+\.\d+(?:\.\d+)?)/i);
     if (mcMatch) {
         return mcMatch[1];
-    } else {
-        const versionCandidates = fileVersion.split(/[+-]/).map(x => x.match(/\d+\.\d+(?:\.\d+)?/)).filter(x => x).map(x => x[0]);
-        return versionCandidates.length > 1 ? versionCandidates.filter(x => x.startsWith("1.")).reverse()[0] : null;
     }
+    const versionCandidates = fileVersion.split(/[+-]/).map(x => x.match(/\d+\.\d+(?:\.\d+)?/)).filter(x => x).map(x => x[0]);
+    if (versionCandidates.length <= 1) {
+        return null;
+    }
+    const mcCandidates = versionCandidates.filter(x => x.startsWith("1."));
+    if (mcCandidates.length) {
+        return mcCandidates[mcCandidates.length - 1];
+    }
+    return versionCandidates[0];
 }
 
 export function parseVersionName(version: string): string | null {

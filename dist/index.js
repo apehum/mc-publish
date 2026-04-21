@@ -25956,10 +25956,15 @@ function parseVersionNameFromFileVersion(fileVersion) {
     if (mcMatch) {
         return mcMatch[1];
     }
-    else {
-        const versionCandidates = fileVersion.split(/[+-]/).map(x => x.match(/\d+\.\d+(?:\.\d+)?/)).filter(x => x).map(x => x[0]);
-        return versionCandidates.length > 1 ? versionCandidates.filter(x => x.startsWith("1.")).reverse()[0] : null;
+    const versionCandidates = fileVersion.split(/[+-]/).map(x => x.match(/\d+\.\d+(?:\.\d+)?/)).filter(x => x).map(x => x[0]);
+    if (versionCandidates.length <= 1) {
+        return null;
     }
+    const mcCandidates = versionCandidates.filter(x => x.startsWith("1."));
+    if (mcCandidates.length) {
+        return mcCandidates[mcCandidates.length - 1];
+    }
+    return versionCandidates[0];
 }
 function parseVersionName(version) {
     const versionCandidates = [...(version.match(/\d+\.\d+(?:\.\d+)?/g) || [])];
@@ -26800,6 +26805,13 @@ function readChangelog(changelogPath) {
         return (yield file.getBuffer()).toString("utf8");
     });
 }
+function compareFileVersions(a, b) {
+    const aVersion = new Version(parseVersionNameFromFileVersion(a));
+    const bVersion = new Version(parseVersionNameFromFileVersion(b));
+    return aVersion.major - bVersion.major ||
+        aVersion.minor - bVersion.minor ||
+        aVersion.build - bVersion.build;
+}
 class ModPublisher extends Publisher {
     get requiresId() {
         return true;
@@ -26817,13 +26829,7 @@ class ModPublisher extends Publisher {
                 throw new Error("No upload files were specified");
             }
             if (options.splitReleases) {
-                const sorted = files.sort((a, b) => {
-                    const aVersion = new Version(parseVersionNameFromFileVersion(a.name));
-                    const bVersion = new Version(parseVersionNameFromFileVersion(b.name));
-                    return aVersion.major - bVersion.major ||
-                        aVersion.minor - bVersion.minor ||
-                        aVersion.build - bVersion.build;
-                });
+                const sorted = files.sort((a, b) => compareFileVersions(a.name, b.name));
                 for (const file of sorted) {
                     yield this.publishFiles([file], options);
                 }

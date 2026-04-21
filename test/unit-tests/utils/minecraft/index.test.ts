@@ -116,6 +116,8 @@ describe("parseVersionNameFromFileVersion", () => {
 
     test("weird formats that contain obvious Minecraft version are parsed correctly", () => {
         expect(parseVersionNameFromFileVersion("1.17-5.0.1-beta+build.29")).toStrictEqual("1.17");
+        expect(parseVersionNameFromFileVersion("fabric-1.21.11-2.1.9")).toStrictEqual("1.21.11");
+        expect(parseVersionNameFromFileVersion("fabric-26.1-2.1.9")).toStrictEqual("26.1");
     });
 
     test("null is returned if version string does not contain obvious Minecraft version", () => {
