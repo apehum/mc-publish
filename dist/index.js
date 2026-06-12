@@ -26755,8 +26755,13 @@ var VersionType;
 })(VersionType || (VersionType = {}));
 /* harmony default export */ const version_type = (VersionType);
 
-;// CONCATENATED MODULE: ./src/publishing/mod-publisher.ts
-var mod_publisher_awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
+;// CONCATENATED MODULE: ./src/utils/sleep.ts
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+;// CONCATENATED MODULE: ./src/utils/retry.ts
+var retry_awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
         function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
@@ -26766,146 +26771,25 @@ var mod_publisher_awaiter = (undefined && undefined.__awaiter) || function (this
     });
 };
 
-
-
-
-
-
-
-
-
-
-
-
-
-function processMultilineInput(input, splitter) {
-    if (!input) {
-        return [];
-    }
-    return (typeof input === "string" ? input.split(splitter || /(\r?\n)+/) : input).map(x => x.trim()).filter(x => x);
-}
-function processDependenciesInput(input, inputSplitter, entrySplitter) {
-    return processMultilineInput(input, inputSplitter).map(x => {
-        var _a;
-        const parts = x.split(entrySplitter || /\|/);
-        const id = parts[0].trim();
-        return dependency.create({
-            id,
-            kind: parts[1] && dependency_kind.parse(parts[1].trim()) || dependency_kind.Depends,
-            version: ((_a = parts[2]) === null || _a === void 0 ? void 0 : _a.trim()) || "*"
-        });
-    });
-}
-function readChangelog(changelogPath) {
-    return mod_publisher_awaiter(this, void 0, void 0, function* () {
-        const file = (yield File.getFiles(changelogPath))[0];
-        if (!file) {
-            throw new Error("Changelog file was not found");
+function retry({ func, delay = 0, maxAttempts = -1, softErrorPredicate, errorCallback }) {
+    return retry_awaiter(this, void 0, void 0, function* () {
+        let attempts = 0;
+        while (true) {
+            try {
+                return yield func();
+            }
+            catch (e) {
+                const isSoft = softErrorPredicate ? softErrorPredicate(e) : e === null || e === void 0 ? void 0 : e.soft;
+                if (!isSoft || maxAttempts >= 0 && ++attempts >= maxAttempts) {
+                    throw e;
+                }
+                if (errorCallback) {
+                    errorCallback(e);
+                }
+            }
+            yield sleep(delay);
         }
-        return (yield file.getBuffer()).toString("utf8");
     });
-}
-function compareFileVersions(a, b) {
-    const aVersion = new Version(parseVersionNameFromFileVersion(a));
-    const bVersion = new Version(parseVersionNameFromFileVersion(b));
-    return aVersion.major - bVersion.major ||
-        aVersion.minor - bVersion.minor ||
-        aVersion.build - bVersion.build;
-}
-class ModPublisher extends Publisher {
-    get requiresId() {
-        return true;
-    }
-    get requiresModLoaders() {
-        return true;
-    }
-    get requiresGameVersions() {
-        return true;
-    }
-    publish(files, options) {
-        return mod_publisher_awaiter(this, void 0, void 0, function* () {
-            this.validateOptions(options);
-            if (!Array.isArray(files) || !files.length) {
-                throw new Error("No upload files were specified");
-            }
-            if (options.splitReleases) {
-                const sorted = files.sort((a, b) => compareFileVersions(a.name, b.name));
-                for (const file of sorted) {
-                    yield this.publishFiles([file], options);
-                }
-            }
-            else {
-                yield this.publishFiles(files, options);
-            }
-        });
-    }
-    publishFiles(files, options) {
-        var _a;
-        return mod_publisher_awaiter(this, void 0, void 0, function* () {
-            const releaseInfo = github.context.payload.release;
-            const token = options.token;
-            if (!token) {
-                throw new Error(`Token is required to publish your assets to ${publisher_target.toString(this.target)}`);
-            }
-            const metadata = yield mod_metadata_reader.readMetadata(files[0].path);
-            const id = options.id || (metadata === null || metadata === void 0 ? void 0 : metadata.getProjectId(this.target));
-            if (!id && this.requiresId) {
-                throw new Error(`Project id is required to publish your assets to ${publisher_target.toString(this.target)}`);
-            }
-            const filename = external_path_default().parse(files[0].path).name;
-            const version = (typeof options.version === "string" && options.version) || (releaseInfo === null || releaseInfo === void 0 ? void 0 : releaseInfo.tag_name) || (metadata === null || metadata === void 0 ? void 0 : metadata.version) || Version.fromName(filename);
-            const versionType = ((_a = options.versionType) === null || _a === void 0 ? void 0 : _a.toLowerCase()) || version_type.fromName((metadata === null || metadata === void 0 ? void 0 : metadata.version) || filename);
-            const name = typeof options.name === "string" ? options.name : ((releaseInfo === null || releaseInfo === void 0 ? void 0 : releaseInfo.name) || version);
-            const changelog = typeof options.changelog === "string"
-                ? options.changelog
-                : typeof options.changelogFile === "string"
-                    ? yield readChangelog(options.changelogFile)
-                    : (releaseInfo === null || releaseInfo === void 0 ? void 0 : releaseInfo.body) || "";
-            const loaders = processMultilineInput(options.loaders, /\s+/);
-            if (!loaders.length && this.requiresModLoaders) {
-                if (metadata) {
-                    loaders.push(...metadata.loaders);
-                }
-                if (!loaders.length) {
-                    throw new Error("At least one mod loader should be specified");
-                }
-            }
-            const resolver = options.versionResolver && MinecraftVersionResolver.byName(options.versionResolver) || MinecraftVersionResolver.releasesIfAny;
-            const gameVersions = (yield Promise.all(processMultilineInput(options.gameVersions).flatMap(version => resolver.resolve(version))))
-                .flatMap(versions => versions)
-                .map(version => version.id);
-            const minecraftDisplayVersion = parseVersionNameFromFileVersion(filename) ||
-                (metadata === null || metadata === void 0 ? void 0 : metadata.dependencies.filter(x => x.id === "minecraft").map(x => parseVersionName(x.version))[0]) ||
-                parseVersionNameFromFileVersion(version);
-            const minecraftVersion = (metadata === null || metadata === void 0 ? void 0 : metadata.dependencies.filter(x => x.id === "minecraft").map(x => x.version)[0]) ||
-                parseVersionNameFromFileVersion(version);
-            if (!gameVersions.length && this.requiresGameVersions) {
-                if (minecraftVersion) {
-                    gameVersions.push(...(yield resolver.resolve(minecraftVersion)).map(x => x.id));
-                }
-                if (!gameVersions.length) {
-                    throw new Error("At least one game version should be specified");
-                }
-            }
-            const fullVersion = options.splitReleases
-                ? (loaders.includes("fabric") || loaders.includes("forge") || loaders.includes("neoforge"))
-                    ? `${loaders[0]}-${minecraftDisplayVersion}-${version}`
-                    : `${loaders[0]}-${version}`
-                : version;
-            const fullName = options.splitReleases
-                ? (loaders.includes("fabric") || loaders.includes("forge") || loaders.includes("neoforge"))
-                    ? `[${mod_loader_type.toString(mod_loader_type.fromString(loaders[0]))} ${minecraftDisplayVersion}] ${name} ${version}`
-                    : `[${mod_loader_type.toString(mod_loader_type.fromString(loaders[0]))}] ${name} ${version}`
-                : name;
-            const java = processMultilineInput(options.java);
-            const dependencies = typeof options.dependencies === "string"
-                ? processDependenciesInput(options.dependencies)
-                : (metadata === null || metadata === void 0 ? void 0 : metadata.dependencies) || [];
-            const uniqueDependencies = dependencies.filter((x, i, self) => !x.ignore && self.findIndex(y => y.id === x.id && y.kind === x.kind) === i);
-            this.logger.info(`Uploading ${fullVersion} (${files[0].name}) to ${publisher_target.toString(this.target)}`);
-            yield this.publishMod(id, token, fullName, fullVersion, versionType, loaders.map(loader => loader.toLowerCase()), gameVersions, java, changelog, files, uniqueDependencies, options);
-        });
-    }
 }
 
 ;// CONCATENATED MODULE: external "process"
@@ -27021,6 +26905,173 @@ function mapInput(value, fallbackValue, mappers, valueType) {
         }
     }
     return fallbackValue;
+}
+
+;// CONCATENATED MODULE: ./src/publishing/mod-publisher.ts
+var mod_publisher_awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function processMultilineInput(input, splitter) {
+    if (!input) {
+        return [];
+    }
+    return (typeof input === "string" ? input.split(splitter || /(\r?\n)+/) : input).map(x => x.trim()).filter(x => x);
+}
+function processDependenciesInput(input, inputSplitter, entrySplitter) {
+    return processMultilineInput(input, inputSplitter).map(x => {
+        var _a;
+        const parts = x.split(entrySplitter || /\|/);
+        const id = parts[0].trim();
+        return dependency.create({
+            id,
+            kind: parts[1] && dependency_kind.parse(parts[1].trim()) || dependency_kind.Depends,
+            version: ((_a = parts[2]) === null || _a === void 0 ? void 0 : _a.trim()) || "*"
+        });
+    });
+}
+function readChangelog(changelogPath) {
+    return mod_publisher_awaiter(this, void 0, void 0, function* () {
+        const file = (yield File.getFiles(changelogPath))[0];
+        if (!file) {
+            throw new Error("Changelog file was not found");
+        }
+        return (yield file.getBuffer()).toString("utf8");
+    });
+}
+function compareFileVersions(a, b) {
+    const aVersion = new Version(parseVersionNameFromFileVersion(a));
+    const bVersion = new Version(parseVersionNameFromFileVersion(b));
+    return aVersion.major - bVersion.major ||
+        aVersion.minor - bVersion.minor ||
+        aVersion.build - bVersion.build;
+}
+class ModPublisher extends Publisher {
+    get requiresId() {
+        return true;
+    }
+    get requiresModLoaders() {
+        return true;
+    }
+    get requiresGameVersions() {
+        return true;
+    }
+    publish(files, options) {
+        return mod_publisher_awaiter(this, void 0, void 0, function* () {
+            this.validateOptions(options);
+            if (!Array.isArray(files) || !files.length) {
+                throw new Error("No upload files were specified");
+            }
+            if (options.splitReleases) {
+                const sorted = files.sort((a, b) => compareFileVersions(a.name, b.name));
+                for (const file of sorted) {
+                    yield this.publishWithRetry([file], options);
+                }
+            }
+            else {
+                yield this.publishWithRetry(files, options);
+            }
+        });
+    }
+    publishWithRetry(files, options) {
+        const retryDelay = mapNumberInput(options.retryDelay);
+        return retry({
+            func: () => this.publishFiles(files, options),
+            maxAttempts: mapNumberInput(options.retryAttempts),
+            delay: retryDelay,
+            errorCallback: (e) => {
+                this.logger.error(e);
+                this.logger.info(`🔂 Retrying to publish assets to ${publisher_target.toString(this.target)} in ${retryDelay} ms...`);
+            }
+        });
+    }
+    publishFiles(files, options) {
+        var _a;
+        return mod_publisher_awaiter(this, void 0, void 0, function* () {
+            const releaseInfo = github.context.payload.release;
+            const token = options.token;
+            if (!token) {
+                throw new Error(`Token is required to publish your assets to ${publisher_target.toString(this.target)}`);
+            }
+            const metadata = yield mod_metadata_reader.readMetadata(files[0].path);
+            const id = options.id || (metadata === null || metadata === void 0 ? void 0 : metadata.getProjectId(this.target));
+            if (!id && this.requiresId) {
+                throw new Error(`Project id is required to publish your assets to ${publisher_target.toString(this.target)}`);
+            }
+            const filename = external_path_default().parse(files[0].path).name;
+            const version = (typeof options.version === "string" && options.version) || (releaseInfo === null || releaseInfo === void 0 ? void 0 : releaseInfo.tag_name) || (metadata === null || metadata === void 0 ? void 0 : metadata.version) || Version.fromName(filename);
+            const versionType = ((_a = options.versionType) === null || _a === void 0 ? void 0 : _a.toLowerCase()) || version_type.fromName((metadata === null || metadata === void 0 ? void 0 : metadata.version) || filename);
+            const name = typeof options.name === "string" ? options.name : ((releaseInfo === null || releaseInfo === void 0 ? void 0 : releaseInfo.name) || version);
+            const changelog = typeof options.changelog === "string"
+                ? options.changelog
+                : typeof options.changelogFile === "string"
+                    ? yield readChangelog(options.changelogFile)
+                    : (releaseInfo === null || releaseInfo === void 0 ? void 0 : releaseInfo.body) || "";
+            const loaders = processMultilineInput(options.loaders, /\s+/);
+            if (!loaders.length && this.requiresModLoaders) {
+                if (metadata) {
+                    loaders.push(...metadata.loaders);
+                }
+                if (!loaders.length) {
+                    throw new Error("At least one mod loader should be specified");
+                }
+            }
+            const resolver = options.versionResolver && MinecraftVersionResolver.byName(options.versionResolver) || MinecraftVersionResolver.releasesIfAny;
+            const gameVersions = (yield Promise.all(processMultilineInput(options.gameVersions).flatMap(version => resolver.resolve(version))))
+                .flatMap(versions => versions)
+                .map(version => version.id);
+            const minecraftDisplayVersion = parseVersionNameFromFileVersion(filename) ||
+                (metadata === null || metadata === void 0 ? void 0 : metadata.dependencies.filter(x => x.id === "minecraft").map(x => parseVersionName(x.version))[0]) ||
+                parseVersionNameFromFileVersion(version);
+            const minecraftVersion = (metadata === null || metadata === void 0 ? void 0 : metadata.dependencies.filter(x => x.id === "minecraft").map(x => x.version)[0]) ||
+                parseVersionNameFromFileVersion(version);
+            if (!gameVersions.length && this.requiresGameVersions) {
+                if (minecraftVersion) {
+                    gameVersions.push(...(yield resolver.resolve(minecraftVersion)).map(x => x.id));
+                }
+                if (!gameVersions.length) {
+                    throw new Error("At least one game version should be specified");
+                }
+            }
+            const fullVersion = options.splitReleases
+                ? (loaders.includes("fabric") || loaders.includes("forge") || loaders.includes("neoforge"))
+                    ? `${loaders[0]}-${minecraftDisplayVersion}-${version}`
+                    : `${loaders[0]}-${version}`
+                : version;
+            const fullName = options.splitReleases
+                ? (loaders.includes("fabric") || loaders.includes("forge") || loaders.includes("neoforge"))
+                    ? `[${mod_loader_type.toString(mod_loader_type.fromString(loaders[0]))} ${minecraftDisplayVersion}] ${name} ${version}`
+                    : `[${mod_loader_type.toString(mod_loader_type.fromString(loaders[0]))}] ${name} ${version}`
+                : name;
+            const java = processMultilineInput(options.java);
+            const dependencies = typeof options.dependencies === "string"
+                ? processDependenciesInput(options.dependencies)
+                : (metadata === null || metadata === void 0 ? void 0 : metadata.dependencies) || [];
+            const uniqueDependencies = dependencies.filter((x, i, self) => !x.ignore && self.findIndex(y => y.id === x.id && y.kind === x.kind) === i);
+            this.logger.info(`Uploading ${fullVersion} (${files[0].name}) to ${publisher_target.toString(this.target)}`);
+            yield this.publishMod(id, token, fullName, fullVersion, versionType, loaders.map(loader => loader.toLowerCase()), gameVersions, java, changelog, files, uniqueDependencies, options);
+        });
+    }
 }
 
 ;// CONCATENATED MODULE: ./src/publishing/github/github-publisher.ts
@@ -27750,43 +27801,6 @@ class PublisherFactory {
     }
 }
 
-;// CONCATENATED MODULE: ./src/utils/sleep.ts
-function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-;// CONCATENATED MODULE: ./src/utils/retry.ts
-var retry_awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
-
-function retry({ func, delay = 0, maxAttempts = -1, softErrorPredicate, errorCallback }) {
-    return retry_awaiter(this, void 0, void 0, function* () {
-        let attempts = 0;
-        while (true) {
-            try {
-                return yield func();
-            }
-            catch (e) {
-                const isSoft = softErrorPredicate ? softErrorPredicate(e) : e === null || e === void 0 ? void 0 : e.soft;
-                if (!isSoft || maxAttempts >= 0 && ++attempts >= maxAttempts) {
-                    throw e;
-                }
-                if (errorCallback) {
-                    errorCallback(e);
-                }
-            }
-            yield sleep(delay);
-        }
-    });
-}
-
 ;// CONCATENATED MODULE: ./node_modules/indent-string/index.js
 function indentString(string, count = 1, options = {}) {
 	const {
@@ -27957,7 +27971,6 @@ var src_awaiter = (undefined && undefined.__awaiter) || function (thisArg, _argu
 
 
 
-
 var FailMode;
 (function (FailMode) {
     FailMode[FailMode["Fail"] = 0] = "Fail";
@@ -27980,22 +27993,11 @@ function main() {
             const options = Object.assign(Object.assign({}, commonOptions), publisherOptions);
             const fileSelector = typeof options.filesPrimary === "string" ? { primary: options.filesPrimary, secondary: typeof options.filesSecondary === "string" ? options.filesSecondary : gradleOutputSelector.secondary } : typeof options.files === "string" ? options.files : gradleOutputSelector;
             const files = yield File.getRequiredFiles(fileSelector);
-            const retryAttempts = mapNumberInput(options.retryAttempts);
-            const retryDelay = mapNumberInput(options.retryDelay);
             const failMode = mapEnumInput(options.failMode, FailMode, FailMode.Fail);
             const publisher = publisherFactory.create(target, logger);
-            const func = {
-                func: () => publisher.publish(files, options),
-                maxAttempts: retryAttempts,
-                delay: retryDelay,
-                errorCallback: (e) => {
-                    logger.error(e);
-                    logger.info(`🔂 Retrying to publish assets to ${targetName} in ${retryDelay} ms...`);
-                }
-            };
             const stopwatch = LoggingStopwatch.startNew(logger, `📤 Publishing assets to ${targetName}...`, ms => `✅ Successfully published assets to ${targetName} (in ${ms} ms)`);
             try {
-                yield retry(func);
+                yield publisher.publish(files, options);
             }
             catch (e) {
                 switch (failMode) {

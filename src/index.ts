@@ -1,9 +1,8 @@
 import File, { gradleOutputSelector } from "./utils/io/file";
 import PublisherFactory from "./publishing/publisher-factory";
 import PublisherTarget from "./publishing/publisher-target";
-import { getInputAsObject, mapEnumInput, mapNumberInput } from "./utils/actions/input";
+import { getInputAsObject, mapEnumInput } from "./utils/actions/input";
 import { getDefaultLogger } from "./utils/logging/logger";
-import retry from "./utils/retry";
 import LoggingStopwatch from "./utils/logging/logging-stopwatch";
 import AggregateError from "aggregate-error";
 
@@ -30,23 +29,12 @@ async function main() {
         const options = { ...commonOptions, ...publisherOptions };
         const fileSelector = typeof options.filesPrimary === "string" ? { primary: options.filesPrimary, secondary: typeof options.filesSecondary === "string" ? options.filesSecondary : gradleOutputSelector.secondary } : typeof options.files === "string" ? options.files : gradleOutputSelector;
         const files = await File.getRequiredFiles(fileSelector);
-        const retryAttempts = mapNumberInput(options.retryAttempts);
-        const retryDelay = mapNumberInput(options.retryDelay);
         const failMode = mapEnumInput(options.failMode, FailMode, FailMode.Fail as FailMode);
         const publisher = publisherFactory.create(target, logger);
-        const func = {
-            func: () => publisher.publish(files, options),
-            maxAttempts: retryAttempts,
-            delay: retryDelay,
-            errorCallback: (e: Error) => {
-                logger.error(e);
-                logger.info(`🔂 Retrying to publish assets to ${targetName} in ${retryDelay} ms...`);
-            }
-        };
 
         const stopwatch = LoggingStopwatch.startNew(logger, `📤 Publishing assets to ${targetName}...`, ms => `✅ Successfully published assets to ${targetName} (in ${ms} ms)`);
         try {
-            await retry(func);
+            await publisher.publish(files, options);
         } catch(e: any) {
             switch (failMode) {
                 case FailMode.Warn:

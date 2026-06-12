@@ -11,11 +11,15 @@ import VersionType from "../utils/versioning/version-type";
 import DependencyKind from "../metadata/dependency-kind";
 import path from "path";
 import ModLoaderType from "../metadata/mod-loader-type";
+import retry from "../utils/retry";
+import { mapNumberInput } from "../utils/actions/input";
 
 interface ModPublisherOptions {
     id: string;
     token: string;
     splitReleases?: boolean;
+    retryAttempts?: string | number;
+    retryDelay?: string | number;
     versionType?: "alpha" | "beta" | "release";
     loaders?: string | string[];
     name?: string;
@@ -88,11 +92,24 @@ export default abstract class ModPublisher extends Publisher<ModPublisherOptions
             const sorted = files.sort((a, b) => compareFileVersions(a.name, b.name));
 
             for (const file of sorted) {
-                await this.publishFiles([file], options);
+                await this.publishWithRetry([file], options);
             }
         } else {
-            await this.publishFiles(files, options);
+            await this.publishWithRetry(files, options);
         }
+    }
+
+    private publishWithRetry(files: File[], options: ModPublisherOptions): Promise<void> {
+        const retryDelay = mapNumberInput(options.retryDelay);
+        return retry({
+            func: () => this.publishFiles(files, options),
+            maxAttempts: mapNumberInput(options.retryAttempts),
+            delay: retryDelay,
+            errorCallback: (e: Error) => {
+                this.logger.error(e);
+                this.logger.info(`🔂 Retrying to publish assets to ${PublisherTarget.toString(this.target)} in ${retryDelay} ms...`);
+            }
+        });
     }
 
     private async publishFiles(files: File[], options: ModPublisherOptions): Promise<void> {
