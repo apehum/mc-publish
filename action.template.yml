@@ -75,10 +75,10 @@ inputs:
 
   retry-attempts:
     description: The maximum number of attempts to publish assets
-    default: 2
+    default: 4
   retry-delay:
     description: Time delay between attempts to publish assets (in milliseconds)
-    default: 10000
+    default: 15000
   fail-mode:
     description: Determines how errors that occur during mod publishing process are handled
 runs:

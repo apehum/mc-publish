@@ -13,6 +13,7 @@ interface ModrinthProject {
 
 interface ModrinthVersion {
     id: string;
+    version_number: string;
     loaders: string[];
     game_versions: string[];
     featured: boolean;

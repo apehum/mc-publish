@@ -119,6 +119,22 @@ export async function convertToCurseForgeVersions(gameVersions: string[], loader
     return [...versions];
 }
 
+export async function getProjectFileNames(id: string): Promise<string[]> {
+    try {
+        const response = await fetch(`https://www.curseforge.com/api/v1/mods/${id}/files?pageSize=50`);
+        if (!response.ok) {
+            return [];
+        }
+        const body = <{ data?: { fileName?: string }[] }>await response.json();
+        if (!Array.isArray(body?.data)) {
+            return [];
+        }
+        return body.data.map(x => x.fileName).filter((x): x is string => typeof x === "string");
+    } catch {
+        return [];
+    }
+}
+
 export async function uploadFile(id: string, data: Record<string, any>, file: File, token: string): Promise<number> {
     if (Array.isArray(data.relations?.projects) && (!data.relations.projects.length || data.parentFileID)) {
         delete data.relations;

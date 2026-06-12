@@ -43,6 +43,13 @@ export default class ModrinthPublisher extends ModPublisher {
     protected async publishMod(id: string, token: string, name: string, version: string, channel: string, loaders: string[], gameVersions: string[], _java: string[], changelog: string, files: File[], dependencies: Dependency[], options: Record<string, unknown>): Promise<void> {
         const featured = channel === "release" && mapBooleanInput(options.featured, true);
         const unfeatureMode = mapEnumInput(options.unfeatureMode, UnfeatureMode, featured ? UnfeatureMode.Subset : UnfeatureMode.None);
+
+        const existingVersions = await getVersions(id, null, null, null, token);
+        if (existingVersions.some(x => x.version_number === version)) {
+            this.logger.info(`Version "${version}" is already published on Modrinth, skipping`);
+            return;
+        }
+
         const projects = (await Promise.all(dependencies
             .filter((x, _, self) => (x.kind !== DependencyKind.Suggests && x.kind !== DependencyKind.Includes) || !self.find(y => y.id === x.id && y.kind !== DependencyKind.Suggests && y.kind !== DependencyKind.Includes))
             .map(async x => ({

@@ -1,7 +1,7 @@
 import File from "../../utils/io/file";
 import ModPublisher from "../mod-publisher";
 import PublisherTarget from "../publisher-target";
-import { convertToCurseForgeVersions, uploadFile } from "../../utils/curseforge";
+import { convertToCurseForgeVersions, getProjectFileNames, uploadFile } from "../../utils/curseforge";
 import Dependency from "../../metadata/dependency";
 import DependencyKind from "../../metadata/dependency-kind";
 
@@ -21,6 +21,7 @@ export default class CurseForgePublisher extends ModPublisher {
     protected async publishMod(id: string, token: string, name: string, _version: string, channel: string, loaders: string[], gameVersions: string[], java: string[], changelog: string, files: File[], dependencies: Dependency[], _options: Record<string, unknown>): Promise<void> {
         let parentFileId = undefined;
         const versions = await convertToCurseForgeVersions(gameVersions, loaders, java, token);
+        const existingFileNames = await getProjectFileNames(id);
         const projects = dependencies
             .filter((x, _, self) => x.kind !== DependencyKind.Suggests || !self.find(y => y.id === x.id && y.kind !== DependencyKind.Suggests))
             .map(x => ({
@@ -30,6 +31,11 @@ export default class CurseForgePublisher extends ModPublisher {
             .filter(x => x.slug && x.type);
 
         for (const file of files) {
+            if (existingFileNames.includes(file.name)) {
+                this.logger.info(`File "${file.name}" is already published on CurseForge, skipping`);
+                continue;
+            }
+
             const data = {
                 changelog,
                 changelogType: "markdown",

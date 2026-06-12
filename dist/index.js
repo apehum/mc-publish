@@ -27423,6 +27423,11 @@ class ModrinthPublisher extends ModPublisher {
         return modrinth_publisher_awaiter(this, void 0, void 0, function* () {
             const featured = channel === "release" && mapBooleanInput(options.featured, true);
             const unfeatureMode = mapEnumInput(options.unfeatureMode, UnfeatureMode, featured ? UnfeatureMode.Subset : UnfeatureMode.None);
+            const existingVersions = yield modrinth_getVersions(id, null, null, null, token);
+            if (existingVersions.some(x => x.version_number === version)) {
+                this.logger.info(`Version "${version}" is already published on Modrinth, skipping`);
+                return;
+            }
             const projects = (yield Promise.all(dependencies
                 .filter((x, _, self) => (x.kind !== dependency_kind.Suggests && x.kind !== dependency_kind.Includes) || !self.find(y => y.id === x.id && y.kind !== dependency_kind.Suggests && y.kind !== dependency_kind.Includes))
                 .map((x) => modrinth_publisher_awaiter(this, void 0, void 0, function* () {
@@ -27591,6 +27596,24 @@ function convertToCurseForgeVersions(gameVersions, loaders, java, token) {
         return [...versions];
     });
 }
+function getProjectFileNames(id) {
+    return curseforge_awaiter(this, void 0, void 0, function* () {
+        try {
+            const response = yield lib_default()(`https://www.curseforge.com/api/v1/mods/${id}/files?pageSize=50`);
+            if (!response.ok) {
+                return [];
+            }
+            const body = yield response.json();
+            if (!Array.isArray(body === null || body === void 0 ? void 0 : body.data)) {
+                return [];
+            }
+            return body.data.map(x => x.fileName).filter((x) => typeof x === "string");
+        }
+        catch (_a) {
+            return [];
+        }
+    });
+}
 function uploadFile(id, data, file, token) {
     var _a;
     return curseforge_awaiter(this, void 0, void 0, function* () {
@@ -27652,6 +27675,7 @@ class CurseForgePublisher extends ModPublisher {
         return curseforge_publisher_awaiter(this, void 0, void 0, function* () {
             let parentFileId = undefined;
             const versions = yield convertToCurseForgeVersions(gameVersions, loaders, java, token);
+            const existingFileNames = yield getProjectFileNames(id);
             const projects = dependencies
                 .filter((x, _, self) => x.kind !== dependency_kind.Suggests || !self.find(y => y.id === x.id && y.kind !== dependency_kind.Suggests))
                 .map(x => ({
@@ -27660,6 +27684,10 @@ class CurseForgePublisher extends ModPublisher {
             }))
                 .filter(x => x.slug && x.type);
             for (const file of files) {
+                if (existingFileNames.includes(file.name)) {
+                    this.logger.info(`File "${file.name}" is already published on CurseForge, skipping`);
+                    continue;
+                }
                 const data = {
                     changelog,
                     changelogType: "markdown",
