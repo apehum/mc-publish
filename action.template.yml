@@ -23,6 +23,10 @@ inputs:
 
   curseforge-id:
     description: The ID of the CurseForge project to upload to
+  curseforge-client:
+    description: Indicates whether the file should be tagged as client-side on CurseForge. Overrides the value derived from environment
+  curseforge-server:
+    description: Indicates whether the file should be tagged as server-side on CurseForge. Overrides the value derived from environment
   curseforge-token:
     description: A valid token for the CurseForge API
 
@@ -64,6 +68,8 @@ inputs:
     description: A list of supported mod loaders
   game-versions:
     description: A list of supported Minecraft versions
+  environment:
+    description: The environment this version is for - e.g. client_only, server_only, server_only_client_optional
   dependencies:
     description: A list of dependencies
   version-resolver:

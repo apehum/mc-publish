@@ -6,6 +6,7 @@ import Dependency from "../../metadata/dependency";
 import DependencyKind from "../../metadata/dependency-kind";
 import { mapBooleanInput, mapEnumInput } from "../../utils/actions/input";
 import LoggingStopwatch from "../../utils/logging/logging-stopwatch";
+import Environment from "../environment";
 
 enum UnfeatureMode {
     None = 0,
@@ -43,6 +44,7 @@ export default class ModrinthPublisher extends ModPublisher {
     protected async publishMod(id: string, token: string, name: string, version: string, channel: string, loaders: string[], gameVersions: string[], _java: string[], changelog: string, files: File[], dependencies: Dependency[], options: Record<string, unknown>): Promise<void> {
         const featured = channel === "release" && mapBooleanInput(options.featured, true);
         const unfeatureMode = mapEnumInput(options.unfeatureMode, UnfeatureMode, featured ? UnfeatureMode.Subset : UnfeatureMode.None);
+        const environment = Environment.parseInput(options.environment);
 
         const existingVersions = await getVersions(id, null, null, null, token);
         if (existingVersions.some(x => x.version_number === version)) {
@@ -70,6 +72,7 @@ export default class ModrinthPublisher extends ModPublisher {
             version_type: channel,
             loaders,
             featured,
+            environment: environment === undefined ? undefined : Environment.toString(environment),
             dependencies: projects
         };
         this.logger.info(`Modrinth data: ${JSON.stringify(data)}`);

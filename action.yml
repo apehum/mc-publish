@@ -25,6 +25,16 @@ inputs:
     description: The ID of the CurseForge project to upload to
     required: false
     default: ${undefined}
+  curseforge-client:
+    description: Indicates whether the file should be tagged as client-side on
+      CurseForge. Overrides the value derived from environment
+    required: false
+    default: ${undefined}
+  curseforge-server:
+    description: Indicates whether the file should be tagged as server-side on
+      CurseForge. Overrides the value derived from environment
+    required: false
+    default: ${undefined}
   curseforge-token:
     description: A valid token for the CurseForge API
     required: false
@@ -104,6 +114,11 @@ inputs:
     description: A list of supported Minecraft versions
     required: false
     default: ${undefined}
+  environment:
+    description: The environment this version is for - e.g. client_only,
+      server_only, server_only_client_optional
+    required: false
+    default: ${undefined}
   dependencies:
     description: A list of dependencies
     required: false
@@ -170,6 +185,11 @@ inputs:
     default: ${undefined}
   modrinth-game-versions:
     description: A list of supported Minecraft versions
+    required: false
+    default: ${undefined}
+  modrinth-environment:
+    description: The environment this version is for - e.g. client_only,
+      server_only, server_only_client_optional
     required: false
     default: ${undefined}
   modrinth-dependencies:
@@ -240,6 +260,11 @@ inputs:
     description: A list of supported Minecraft versions
     required: false
     default: ${undefined}
+  curseforge-environment:
+    description: The environment this version is for - e.g. client_only,
+      server_only, server_only_client_optional
+    required: false
+    default: ${undefined}
   curseforge-dependencies:
     description: A list of dependencies
     required: false
@@ -306,6 +331,11 @@ inputs:
     default: ${undefined}
   github-game-versions:
     description: A list of supported Minecraft versions
+    required: false
+    default: ${undefined}
+  github-environment:
+    description: The environment this version is for - e.g. client_only,
+      server_only, server_only_client_optional
     required: false
     default: ${undefined}
   github-dependencies:

@@ -100,6 +100,8 @@ jobs:
 | [modrinth-featured](#user-content-modrinth-featured) | Indicates whether the version should be featured on Modrinth or not | `true` | `true` <br> `false` |
 | [modrinth-unfeature-mode](#user-content-modrinth-unfeature-mode) | Determines the way automatic unfeaturing of older Modrinth versions works | If [`modrinth-featured`](#user-content-modrinth-featured) is set to true, `subset`; otherwise, `none` | `none` <br> `subset` <br> `intersection` <br> `any` |
 | [curseforge-id](#user-content-curseforge-id) | The ID of the CurseForge project to upload to | A value specified in the config file | `394468` |
+| [curseforge-client](#user-content-curseforge-client) | Indicates whether the file should be tagged as client-side on CurseForge | Derived from [`environment`](#user-content-environment) | `true` <br> `false` |
+| [curseforge-server](#user-content-curseforge-server) | Indicates whether the file should be tagged as server-side on CurseForge | Derived from [`environment`](#user-content-environment) | `true` <br> `false` |
 | [curseforge-token](#user-content-curseforge-token) | A valid token for the CurseForge API | ❌ | `${{ secrets.CURSEFORGE_TOKEN }}` |
 | [github-tag](#user-content-github-tag) | The tag name of the release to upload assets to | A tag of the release that triggered the action, if any; otherwise it will be inferred from the `GITHUB_REF` environment variable | `mc1.17.1-0.3.2` |
 | [github-generate-changelog](#user-content-github-generate-changelog) | Indicates whether to automatically generate the changelog for this release. If changelog is specified, it will be pre-pended to the automatically generated notes. Unused if the GitHub Release already exists [🛈](https://docs.github.com/en/rest/releases/releases#create-a-release) | `true`, if [`changelog`](#user-content-changelog) and [`changelog-file`](#user-content-changelog-file) are not provided; otherwise, `false` | `false` <br> `true` |
@@ -118,6 +120,7 @@ jobs:
 | [changelog-file](#user-content-changelog-file) | A glob of the changelog file | ❌ | `CHANGELOG.md` |
 | [loaders](#user-content-loaders) | A list of supported mod loaders | `fabric` for Fabric mods <br> `forge` for Forge mods <br> `quilt` for Quilt mods | `fabric` <br> `forge` <br> `quilt` <br> `rift` |
 | [game-versions](#user-content-game-versions) | A list of supported Minecraft versions | A value specified in the config file, if any; otherwise, it will be parsed from the [`version`](#user-content-version) value | `21w37a` <br> `1.17` |
+| [environment](#user-content-environment) | The environment this version is for | ❌ *(required when publishing to CurseForge)* | `client_only` <br> `server_only` <br> `server_only_client_optional` |
 | [version-resolver](#user-content-version-resolver) | Determines the way automatic [`game-versions`](#user-content-game-versions) resolvement works | `releasesIfAny` | `exact` <br> `latest` <br> `all` <br> `releases` <br> `releasesIfAny` |
 | [dependencies](#user-content-dependencies) | A list of dependencies | A dependency list specified in the config file  | `fabric \| depends \| 0.40.0` <br> `fabric-api` |
 | [java](#user-content-java) | A list of supported Java versions | *empty string* | `Java 8` <br> `Java 1.8` <br> `8` |
@@ -298,6 +301,14 @@ Available presets:
 #### curseforge-id
 
 The ID of the CurseForge project to upload to.
+
+#### curseforge-client
+
+Indicates whether the file should be tagged as client-side on CurseForge. If no value is provided, it's derived from [`environment`](#user-content-environment).
+
+#### curseforge-server
+
+Indicates whether the file should be tagged as server-side on CurseForge. If no value is provided, it's derived from [`environment`](#user-content-environment).
 
 ```yaml
 curseforge-id: 394468
@@ -561,6 +572,31 @@ game-versions: |
   1.17.1
   21w37a
 ```
+
+#### environment
+
+The environment this version is for. If no value is provided, no environment metadata is published, and the platforms keep whatever is configured project-wide.
+
+```yaml
+environment: server_only_client_optional
+```
+
+The accepted values are the ones [Modrinth](https://docs.modrinth.com/api/operations/createversion/) uses, and they are sent to it as-is:
+
+ - `client_only` - all functionality is on the client-side
+ - `server_only` - all functionality is on the server-side, functionality also present in singleplayer
+ - `dedicated_server_only` - only runs on a dedicated server, no functionality in singleplayer
+ - `client_and_server` - requires both the client and the server to have the project installed
+ - `server_only_client_optional` - requires the server to have the project installed, the client can optionally have it for extra functionality
+ - `client_only_server_optional` - requires the client to have the project installed, the server can optionally have it for extra functionality
+ - `client_or_server` - runs on either side, with no extra functionality if both have it installed
+ - `client_or_server_prefers_both` - runs on either side, with extra functionality if both have it installed
+ - `singleplayer_only` - only runs in singleplayer, no functionality in multiplayer
+ - `unknown`
+
+CurseForge only knows `client` and `server`, so the value is mapped onto those two tags: `client_only` and `singleplayer_only` become client-only, `dedicated_server_only` becomes server-only, `unknown` is not tagged at all, and everything else is tagged as both. Use [`curseforge-client`](#user-content-curseforge-client) and [`curseforge-server`](#user-content-curseforge-server) if you need to override that.
+
+CurseForge has required every file to declare an environment [since July 15th, 2026](https://support.curseforge.com/support/solutions/articles/9000197321-curseforge-upload-api), so publishing to it fails before anything is uploaded when the value maps onto neither tag - that is, when it's missing, `unknown`, or both `curseforge-client` and `curseforge-server` are set to `false`. Modrinth has no such requirement, and no environment is sent to it when none is specified.
 
 #### version-resolver
 

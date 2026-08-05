@@ -17,6 +17,7 @@ interface CurseForgeVersions {
     gameVersions: CurseForgeVersion[];
     loaders: CurseForgeVersion[];
     java: CurseForgeVersion[];
+    environments: CurseForgeVersion[];
 }
 
 interface CurseForgeUploadErrorInfo {
@@ -66,6 +67,7 @@ async function loadCurseForgeVersions(token: string): Promise<CurseForgeVersions
     const javaVersionTypes = versionTypes.filter(x => x.slug.startsWith("java")).map(x => x.id);
     const minecraftVersionTypes = versionTypes.filter(x => x.slug.startsWith("minecraft")).map(x => x.id);
     const loaderVersionTypes = versionTypes.filter(x => x.slug.startsWith("modloader")).map(x => x.id);
+    const environmentVersionTypes = versionTypes.filter(x => x.slug === "environment").map(x => x.id);
 
     const versions = await fetchJsonArray<CurseForgeVersion>(`${baseUrl}/game/versions?token=${token}`);
     return versions.reduce((container, version) => {
@@ -75,9 +77,11 @@ async function loadCurseForgeVersions(token: string): Promise<CurseForgeVersions
             container.gameVersions.push(version);
         } else if (loaderVersionTypes.includes(version.gameVersionTypeID)) {
             container.loaders.push(version);
+        } else if (environmentVersionTypes.includes(version.gameVersionTypeID)) {
+            container.environments.push(version);
         }
         return container;
-    }, { gameVersions: new Array<CurseForgeVersion>(), loaders: new Array<CurseForgeVersion>(), java: new Array<CurseForgeVersion>() });
+    }, { gameVersions: new Array<CurseForgeVersion>(), loaders: new Array<CurseForgeVersion>(), java: new Array<CurseForgeVersion>(), environments: new Array<CurseForgeVersion>() });
 }
 
 export async function unifyGameVersion(gameVersion: string): Promise<string> {
@@ -108,13 +112,21 @@ async function addVersionIntersectionToSet(curseForgeVersions: CurseForgeVersion
     }
 }
 
-export async function convertToCurseForgeVersions(gameVersions: string[], loaders: string[], java: string[], token: string): Promise<number[]> {
+export async function convertToCurseForgeVersions(gameVersions: string[], loaders: string[], java: string[], environments: string[], token: string): Promise<number[]> {
     const versions = new Set<number>();
     const curseForgeVersions = await getCurseForgeVersions(token);
 
     await addVersionIntersectionToSet(curseForgeVersions.gameVersions, gameVersions, unifyGameVersion, (cfv, v) => cfv.name === v, versions);
     await addVersionIntersectionToSet(curseForgeVersions.loaders, loaders, x => x.trim().toLowerCase(), (cfv, v) => cfv.slug === v, versions);
     await addVersionIntersectionToSet(curseForgeVersions.java, java, unifyJava, (cfv, v) => cfv.name === v, versions);
+
+    for (const environment of environments) {
+        const curseForgeVersion = curseForgeVersions.environments.find(x => x.slug === environment.trim().toLowerCase());
+        if (!curseForgeVersion) {
+            throw new Error(`CurseForge does not have a "${environment}" environment`);
+        }
+        versions.add(curseForgeVersion.id);
+    }
 
     return [...versions];
 }

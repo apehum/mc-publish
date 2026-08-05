@@ -94,7 +94,7 @@ describe("convertToCurseForgeVersions", () => {
             }
         };
 
-        const curseForgeVersions = await convertToCurseForgeVersions(Object.keys(versions.gameVersions), Object.keys(versions.loaders), Object.keys(versions.java), process.env.CURSEFORGE_TOKEN as string);
+        const curseForgeVersions = await convertToCurseForgeVersions(Object.keys(versions.gameVersions), Object.keys(versions.loaders), Object.keys(versions.java), [], process.env.CURSEFORGE_TOKEN as string);
         const expectedIds = new Set([...Object.values<number>(versions.gameVersions), ...Object.values(versions.loaders), ...Object.values(versions.java)]);
 
         expect(curseForgeVersions).toHaveLength(expectedIds.size);

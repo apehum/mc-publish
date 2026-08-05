@@ -25701,7 +25701,7 @@ function wrappy (fn, cb) {
 
 /***/ }),
 
-/***/ 524:
+/***/ 6202:
 /***/ ((__unused_webpack_module, __webpack_exports__, __nccwpck_require__) => {
 
 "use strict";
@@ -27427,6 +27427,65 @@ class LoggingStopwatch extends Stopwatch {
     }
 }
 
+;// CONCATENATED MODULE: ./src/publishing/environment.ts
+var Environment;
+(function (Environment) {
+    Environment[Environment["ClientAndServer"] = 1] = "ClientAndServer";
+    Environment[Environment["ClientOnly"] = 2] = "ClientOnly";
+    Environment[Environment["ClientOnlyServerOptional"] = 3] = "ClientOnlyServerOptional";
+    Environment[Environment["SingleplayerOnly"] = 4] = "SingleplayerOnly";
+    Environment[Environment["ServerOnly"] = 5] = "ServerOnly";
+    Environment[Environment["ServerOnlyClientOptional"] = 6] = "ServerOnlyClientOptional";
+    Environment[Environment["DedicatedServerOnly"] = 7] = "DedicatedServerOnly";
+    Environment[Environment["ClientOrServer"] = 8] = "ClientOrServer";
+    Environment[Environment["ClientOrServerPrefersBoth"] = 9] = "ClientOrServerPrefersBoth";
+    Environment[Environment["Unknown"] = 10] = "Unknown";
+})(Environment || (Environment = {}));
+(function (Environment) {
+    const curseForgeSides = new Map([
+        [Environment.ClientOnly, { client: true, server: false }],
+        [Environment.SingleplayerOnly, { client: true, server: false }],
+        [Environment.DedicatedServerOnly, { client: false, server: true }],
+        [Environment.Unknown, { client: false, server: false }],
+    ]);
+    const defaultCurseForgeSides = { client: true, server: true };
+    const normalize = (name) => name.replace(/[-_\s]/g, "").toLowerCase();
+    function getValues() {
+        return Object.values(Environment).filter(x => typeof x === "number");
+    }
+    Environment.getValues = getValues;
+    function parse(name) {
+        const normalizedName = normalize(name);
+        return getValues().find(x => normalize(Environment[x]) === normalizedName);
+    }
+    Environment.parse = parse;
+    function parseInput(value) {
+        if (typeof value !== "string" || !value.trim()) {
+            return undefined;
+        }
+        const environment = parse(value);
+        if (environment === undefined) {
+            throw new Error(`Unknown environment "${value.trim()}", expected one of: ${getValues().map(toString).join(", ")}`);
+        }
+        return environment;
+    }
+    Environment.parseInput = parseInput;
+    function toString(environment) {
+        const name = Environment[environment];
+        if (!name) {
+            return environment.toString();
+        }
+        return name.replace(/([a-z])([A-Z])/g, "$1_$2").toLowerCase();
+    }
+    Environment.toString = toString;
+    function toCurseForgeSides(environment) {
+        var _a;
+        return (_a = curseForgeSides.get(environment)) !== null && _a !== void 0 ? _a : defaultCurseForgeSides;
+    }
+    Environment.toCurseForgeSides = toCurseForgeSides;
+})(Environment || (Environment = {}));
+/* harmony default export */ const publishing_environment = (Environment);
+
 ;// CONCATENATED MODULE: ./src/publishing/modrinth/modrinth-publisher.ts
 var modrinth_publisher_awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
@@ -27437,6 +27496,7 @@ var modrinth_publisher_awaiter = (undefined && undefined.__awaiter) || function 
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+
 
 
 
@@ -27474,6 +27534,7 @@ class ModrinthPublisher extends ModPublisher {
         return modrinth_publisher_awaiter(this, void 0, void 0, function* () {
             const featured = channel === "release" && mapBooleanInput(options.featured, true);
             const unfeatureMode = mapEnumInput(options.unfeatureMode, UnfeatureMode, featured ? UnfeatureMode.Subset : UnfeatureMode.None);
+            const environment = publishing_environment.parseInput(options.environment);
             const existingVersions = yield modrinth_getVersions(id, null, null, null, token);
             if (existingVersions.some(x => x.version_number === version)) {
                 this.logger.info(`Version "${version}" is already published on Modrinth, skipping`);
@@ -27500,6 +27561,7 @@ class ModrinthPublisher extends ModPublisher {
                 version_type: channel,
                 loaders,
                 featured,
+                environment: environment === undefined ? undefined : publishing_environment.toString(environment),
                 dependencies: projects
             };
             this.logger.info(`Modrinth data: ${JSON.stringify(data)}`);
@@ -27593,6 +27655,7 @@ function loadCurseForgeVersions(token) {
         const javaVersionTypes = versionTypes.filter(x => x.slug.startsWith("java")).map(x => x.id);
         const minecraftVersionTypes = versionTypes.filter(x => x.slug.startsWith("minecraft")).map(x => x.id);
         const loaderVersionTypes = versionTypes.filter(x => x.slug.startsWith("modloader")).map(x => x.id);
+        const environmentVersionTypes = versionTypes.filter(x => x.slug === "environment").map(x => x.id);
         const versions = yield fetchJsonArray(`${curseforge_baseUrl}/game/versions?token=${token}`);
         return versions.reduce((container, version) => {
             if (javaVersionTypes.includes(version.gameVersionTypeID)) {
@@ -27604,8 +27667,11 @@ function loadCurseForgeVersions(token) {
             else if (loaderVersionTypes.includes(version.gameVersionTypeID)) {
                 container.loaders.push(version);
             }
+            else if (environmentVersionTypes.includes(version.gameVersionTypeID)) {
+                container.environments.push(version);
+            }
             return container;
-        }, { gameVersions: new Array(), loaders: new Array(), java: new Array() });
+        }, { gameVersions: new Array(), loaders: new Array(), java: new Array(), environments: new Array() });
     });
 }
 function unifyGameVersion(gameVersion) {
@@ -27637,13 +27703,20 @@ function addVersionIntersectionToSet(curseForgeVersions, versions, unify, compar
         }
     });
 }
-function convertToCurseForgeVersions(gameVersions, loaders, java, token) {
+function convertToCurseForgeVersions(gameVersions, loaders, java, environments, token) {
     return curseforge_awaiter(this, void 0, void 0, function* () {
         const versions = new Set();
         const curseForgeVersions = yield getCurseForgeVersions(token);
         yield addVersionIntersectionToSet(curseForgeVersions.gameVersions, gameVersions, unifyGameVersion, (cfv, v) => cfv.name === v, versions);
         yield addVersionIntersectionToSet(curseForgeVersions.loaders, loaders, x => x.trim().toLowerCase(), (cfv, v) => cfv.slug === v, versions);
         yield addVersionIntersectionToSet(curseForgeVersions.java, java, unifyJava, (cfv, v) => cfv.name === v, versions);
+        for (const environment of environments) {
+            const curseForgeVersion = curseForgeVersions.environments.find(x => x.slug === environment.trim().toLowerCase());
+            if (!curseForgeVersion) {
+                throw new Error(`CurseForge does not have a "${environment}" environment`);
+            }
+            versions.add(curseForgeVersion.id);
+        }
         return [...versions];
     });
 }
@@ -27711,6 +27784,8 @@ var curseforge_publisher_awaiter = (undefined && undefined.__awaiter) || functio
 
 
 
+
+
 const forgeDependencyKinds = new Map([
     [dependency_kind.Depends, "requiredDependency"],
     [dependency_kind.Recommends, "optionalDependency"],
@@ -27722,10 +27797,11 @@ class CurseForgePublisher extends ModPublisher {
     get target() {
         return publisher_target.CurseForge;
     }
-    publishMod(id, token, name, _version, channel, loaders, gameVersions, java, changelog, files, dependencies, _options) {
+    publishMod(id, token, name, _version, channel, loaders, gameVersions, java, changelog, files, dependencies, options) {
         return curseforge_publisher_awaiter(this, void 0, void 0, function* () {
             let parentFileId = undefined;
-            const versions = yield convertToCurseForgeVersions(gameVersions, loaders, java, token);
+            const environments = this.resolveEnvironments(options);
+            const versions = yield convertToCurseForgeVersions(gameVersions, loaders, java, environments, token);
             const existingFileNames = yield getProjectFileNames(id);
             const projects = dependencies
                 .filter((x, _, self) => x.kind !== dependency_kind.Suggests || !self.find(y => y.id === x.id && y.kind !== dependency_kind.Suggests))
@@ -27754,6 +27830,18 @@ class CurseForgePublisher extends ModPublisher {
                 }
             }
         });
+    }
+    resolveEnvironments(options) {
+        const environment = publishing_environment.parseInput(options.environment);
+        const sides = environment === undefined ? { client: false, server: false } : publishing_environment.toCurseForgeSides(environment);
+        const environments = [
+            mapBooleanInput(options.client, sides.client) && "client",
+            mapBooleanInput(options.server, sides.server) && "server",
+        ].filter((x) => !!x);
+        if (!environments.length) {
+            throw new Error("CurseForge requires at least one environment. Set \"environment\" (e.g. \"server_only_client_optional\"), or \"curseforge-client\"/\"curseforge-server\" directly");
+        }
+        return environments;
     }
     upload(id, data, file, token) {
         var _a, _b;
@@ -36566,7 +36654,7 @@ module.exports = JSON.parse('[[[0,44],"disallowed_STD3_valid"],[[45,46],"valid"]
 /******/ 	// startup
 /******/ 	// Load entry module and return exports
 /******/ 	// This entry module doesn't tell about it's top-level declarations so it can't be inlined
-/******/ 	var __webpack_exports__ = __nccwpck_require__(524);
+/******/ 	var __webpack_exports__ = __nccwpck_require__(6202);
 /******/ 	module.exports = __webpack_exports__;
 /******/ 	
 /******/ })()
