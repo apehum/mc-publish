@@ -59,6 +59,11 @@ async function readChangelog(changelogPath: string): Promise<string | never> {
     return (await file.getBuffer()).toString("utf8");
 }
 
+function formatLoaderName(loader: string): string {
+    const type = ModLoaderType.fromString(loader);
+    return type ? ModLoaderType.toString(type) : loader.charAt(0).toUpperCase() + loader.slice(1);
+}
+
 export function compareFileVersions(a: string, b: string): number {
     const aVersion = new Version(parseVersionNameFromFileVersion(a));
     const bVersion = new Version(parseVersionNameFromFileVersion(b));
@@ -179,8 +184,8 @@ export default abstract class ModPublisher extends Publisher<ModPublisherOptions
 
         const fullName = options.splitReleases
             ? (loaders.includes("fabric") || loaders.includes("forge") || loaders.includes("neoforge"))
-                ? `[${ModLoaderType.toString(ModLoaderType.fromString(loaders[0]))} ${minecraftDisplayVersion}] ${name} ${version}`
-                : `[${ModLoaderType.toString(ModLoaderType.fromString(loaders[0]))}] ${name} ${version}`
+                ? `[${formatLoaderName(loaders[0])} ${minecraftDisplayVersion}] ${name} ${version}`
+                : `[${formatLoaderName(loaders[0])}] ${name} ${version}`
             : name;
 
         const java = processMultilineInput(options.java);

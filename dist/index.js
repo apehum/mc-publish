@@ -26959,6 +26959,10 @@ function readChangelog(changelogPath) {
         return (yield file.getBuffer()).toString("utf8");
     });
 }
+function formatLoaderName(loader) {
+    const type = mod_loader_type.fromString(loader);
+    return type ? mod_loader_type.toString(type) : loader.charAt(0).toUpperCase() + loader.slice(1);
+}
 function compareFileVersions(a, b) {
     const aVersion = new Version(parseVersionNameFromFileVersion(a));
     const bVersion = new Version(parseVersionNameFromFileVersion(b));
@@ -27060,8 +27064,8 @@ class ModPublisher extends Publisher {
                 : version;
             const fullName = options.splitReleases
                 ? (loaders.includes("fabric") || loaders.includes("forge") || loaders.includes("neoforge"))
-                    ? `[${mod_loader_type.toString(mod_loader_type.fromString(loaders[0]))} ${minecraftDisplayVersion}] ${name} ${version}`
-                    : `[${mod_loader_type.toString(mod_loader_type.fromString(loaders[0]))}] ${name} ${version}`
+                    ? `[${formatLoaderName(loaders[0])} ${minecraftDisplayVersion}] ${name} ${version}`
+                    : `[${formatLoaderName(loaders[0])}] ${name} ${version}`
                 : name;
             const java = processMultilineInput(options.java);
             const dependencies = typeof options.dependencies === "string"
