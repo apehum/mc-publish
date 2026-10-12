@@ -26084,6 +26084,15 @@ class GameVersionResolver {
 }
 
 ;// CONCATENATED MODULE: ./src/utils/minecraft/minecraft-version-resolver.ts
+var minecraft_version_resolver_awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 
 
 class MinecraftVersionResolver extends GameVersionResolver {
@@ -26094,6 +26103,18 @@ class MinecraftVersionResolver extends GameVersionResolver {
             }
         }
         return null;
+    }
+    resolve(version) {
+        const _super = Object.create(null, {
+            resolve: { get: () => super.resolve }
+        });
+        return minecraft_version_resolver_awaiter(this, void 0, void 0, function* () {
+            const exact = typeof version === "string" ? yield getVersionById(version) : null;
+            if (exact === null || exact === void 0 ? void 0 : exact.isSnapshot) {
+                return [exact];
+            }
+            return _super.resolve.call(this, version);
+        });
     }
     getCompatibleVersions(version) {
         return getCompatibleBuilds(version);

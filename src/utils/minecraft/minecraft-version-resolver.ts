@@ -1,5 +1,5 @@
 import GameVersionResolver from "../versioning/game-version-resolver";
-import { getCompatibleBuilds, MinecraftVersion } from ".";
+import { getCompatibleBuilds, getVersionById, MinecraftVersion } from ".";
 import Version from "../versioning/version";
 
 export default class MinecraftVersionResolver extends GameVersionResolver<MinecraftVersion> {
@@ -16,6 +16,14 @@ export default class MinecraftVersionResolver extends GameVersionResolver<Minecr
             }
         }
         return null;
+    }
+
+    public async resolve(version: string | Version): Promise<MinecraftVersion[]> {
+        const exact = typeof version === "string" ? await getVersionById(version) : null;
+        if (exact?.isSnapshot) {
+            return [exact];
+        }
+        return super.resolve(version);
     }
 
     public getCompatibleVersions(version: string | Version): Promise<MinecraftVersion[]> {

@@ -20,6 +20,21 @@ describe("MinecraftVersionResolver.byName", () => {
     });
 });
 
+describe("MinecraftVersionResolver.resolve", () => {
+    test("snapshot ids are resolved directly by every resolver", async () => {
+        for (const resolver of [MinecraftVersionResolver.releasesIfAny, MinecraftVersionResolver.exact, MinecraftVersionResolver.all]) {
+            expect((await resolver.resolve("26.4-snapshot-1")).map(x => x.id)).toStrictEqual(["26.4-snapshot-1"]);
+            expect((await resolver.resolve("26.3-pre-2")).map(x => x.id)).toStrictEqual(["26.3-pre-2"]);
+        }
+    });
+
+    test("release ids are still resolved as ranges", async () => {
+        const _1_21 = (await MinecraftVersionResolver.releasesIfAny.resolve("1.21")).map(x => x.id);
+        expect(_1_21).toContain("1.21");
+        expect(_1_21).toContain("1.21.1");
+    });
+});
+
 describe("MinecraftVersionResolver.exact", () => {
     test("the exact version is returned", async () => {
         const _1_17 = (await MinecraftVersionResolver.exact.resolve("1.17")).map(x => x.id);
